@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interactive Periodic Table</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0c10;
+  --surface: #12151c;
+  --border: #1e2330;
+  --text: #e8eaf0;
+  --text-dim: #6b7394;
+  --text-muted: #3d4566;
+
+  /* Category colors */
+  --alkali: #ff6b6b;
+  --alkaline: #ffa94d;
+  --transition: #ffd43b;
+  --post-transition: #69db7c;
+  --metalloid: #38d9a9;
+  --nonmetal: #4dabf7;
+  --halogen: #748ffc;
+  --noble: #da77f2;
+  --lanthanide: #f783ac;
+  --actinide: #e599f7;
+  --unknown: #868e96;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Outfit', sans-serif;
+  min-height: 100vh;
+  overflow-x: auto;
+  position: relative;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(77, 105, 255, 0.08), transparent),
+    radial-gradient(ellipse 60% 40% at 80% 100%, rgba(218, 119, 242, 0.05), transparent);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.app {
+  position: relative;
+  z-index: 1;
+  padding: 20px 24px 30px;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+header {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+h1 {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 800;
+  font-size: 28px;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, #fff 0%, #a0aec0 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+header .subtitle {
+  font-size: 13px;
+  color: var(--text-dim);
+  font-weight: 300;
+}
+
+/* Filter bar */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.filter-btn {
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-dim);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 400;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.filter-btn:hover {
+  border-color: #4a5580;
+  color: var(--text);
+}
+
+.filter-btn.active {
+  border-color: var(--cat-color, #4dabf7);
+  color: var(--cat-color, #4dabf7);
+  background: color-mix(in srgb, var(--cat-color, #4dabf7) 10%, var(--surface));
+}
+
+/* Table grid */
+.table-wrapper {
+  overflow-x: auto;
+  padding-bottom: 10px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(18, 1fr);
+  gap: 3px;
+  min-width: 900px;
+}
+
+/* Element cell */
+.element {
+  aspect-ratio: 1;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: all 0.2s ease;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.element::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--cat-color);
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.element:hover {
+  transform: scale(1.15);
+  z-index: 10;
+  border-color: var(--cat-color);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--cat-color) 30%, transparent);
+}
+
+.element:hover::before { opacity: 1; }
+
+.element .number {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  color: var(--text-muted);
+  position: absolute;
+  top: 3px;
+  left: 4px;
+}
+
+.element .symbol {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--cat-color);
+}
+
+.element .name {
+  font-size: 7px;
+  color: var(--text-dim);
+  margin-top: 1px;
+  text-align: center;
+  max-width: 90%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.element .mass {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7px;
+  color: var(--text-muted);
+}
+
+.element.dimmed {
+  opacity: 0.12;
+  pointer-events: none;
+}
+
+.element.highlighted {
+  border-color: var(--cat-color);
+  background: color-mix(in srgb, var(--cat-color) 8%, var(--surface));
+}
+
+/* Spacer */
+.spacer { visibility: hidden; }
+
+/* Lanthanide/Actinide labels */
+.series-label {
+  grid-column: 1 / 4;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* Gap rows */
+.gap-row {
+  grid-column: 1 / -1;
+  height: 10px;
+}
+
+/* Detail panel */
+.detail-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.9);
+  width: 420px;
+  max-width: 92vw;
+  max-height: 85vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 32px;
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 25px 80px rgba(0,0,0,0.6);
+}
+
+.detail-panel.open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.detail-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  z-index: 999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+.detail-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.detail-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.detail-symbol-box {
+  width: 80px;
+  height: 80px;
+  border-radius: 12px;
+  border: 2px solid var(--cat-color);
+  background: color-mix(in srgb, var(--cat-color) 8%, var(--bg));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.detail-symbol-box .symbol {
+  font-size: 36px;
+  font-weight: 800;
+  color: var(--cat-color);
+  line-height: 1;
+}
+
+.detail-symbol-box .number {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.detail-info h2 {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.detail-info .category {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--cat-color);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.detail-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-dim);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: all 0.2s;
+}
+
+.detail-close:hover {
+  border-color: #4a5580;
+  color: var(--text);
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.detail-item {
+  padding: 10px 12px;
+  background: var(--bg);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.detail-item .label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.detail-item .value {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.detail-item .unit {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-weight: 300;
+}
+
+.detail-item.full {
+  grid-column: 1 / -1;
+}
+
+.electron-config {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text);
+  word-break: break-all;
+}
+
+/* Legend */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+/* Search */
+.search-box {
+  position: relative;
+  margin-bottom: 16px;
+  max-width: 280px;
+}
+
+.search-box input {
+  width: 100%;
+  padding: 8px 14px 8px 34px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.search-box input::placeholder { color: var(--text-muted); }
+.search-box input:focus { border-color: #4a5580; }
+
+.search-box .icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+/* Temperature state bar */
+.temp-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.temp-bar label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.temp-slider {
+  flex: 1;
+  max-width: 300px;
+  -webkit-appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #4dabf7, #ffd43b, #ff6b6b);
+  outline: none;
+}
+
+.temp-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+  box-shadow: 0 0 6px rgba(0,0,0,0.4);
+}
+
+.temp-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--text);
+  min-width: 60px;
+}
+
+.element.state-solid { }
+.element.state-liquid .symbol { text-decoration: underline; text-decoration-style: wavy; text-underline-offset: 3px; }
+.element.state-gas .symbol { opacity: 0.75; }
+.element.state-unknown .symbol { font-style: italic; }
+
+@media (max-width: 768px) {
+  .app { padding: 12px; }
+  h1 { font-size: 20px; }
+  .grid { gap: 2px; }
+  .element .symbol { font-size: 12px; }
+  .element .name, .element .mass, .element .number { display: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <h1>Periodic Table</h1>
+    <span class="subtitle">118 Elements — Interactive Explorer</span>
+  </header>
+
+  <div class="search-box">
+    <span class="icon">⌕</span>
+    <input type="text" id="search" placeholder="Search by name, symbol, or number..." autocomplete="off">
+  </div>
+
+  <div class="temp-bar">
+    <label>Temperature</label>
+    <input type="range" class="temp-slider" id="tempSlider" min="0" max="6000" value="293">
+    <span class="temp-value" id="tempValue">293 K</span>
+  </div>
+
+  <div class="filters" id="filters"></div>
+
+  <div class="table-wrapper">
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <div class="legend" id="legend"></div>
+</div>
+
+<div class="detail-overlay" id="overlay"></div>
+<div class="detail-panel" id="detailPanel">
+  <button class="detail-close" id="detailClose">✕</button>
+  <div id="detailContent"></div>
+</div>
+
+<script>
+const elements = [
+  {z:1,sym:"H",name:"Hydrogen",mass:1.008,cat:"nonmetal",group:1,period:1,econfig:"1s¹",mp:14.01,bp:20.28,density:0.00008988,discovered:1766,phase:"gas",eneg:2.20,radius:53,ionization:1312.0},
+  {z:2,sym:"He",name:"Helium",mass:4.003,cat:"noble",group:18,period:1,econfig:"1s²",mp:null,bp:4.22,density:0.0001785,discovered:1868,phase:"gas",eneg:null,radius:31,ionization:2372.3},
+  {z:3,sym:"Li",name:"Lithium",mass:6.941,cat:"alkali",group:1,period:2,econfig:"[He] 2s¹",mp:453.69,bp:1615,density:0.534,discovered:1817,phase:"solid",eneg:0.98,radius:167,ionization:520.2},
+  {z:4,sym:"Be",name:"Beryllium",mass:9.012,cat:"alkaline",group:2,period:2,econfig:"[He] 2s²",mp:1560,bp:2742,density:1.85,discovered:1798,phase:"solid",eneg:1.57,radius:112,ionization:899.5},
+  {z:5,sym:"B",name:"Boron",mass:10.81,cat:"metalloid",group:13,period:2,econfig:"[He] 2s² 2p¹",mp:2349,bp:4200,density:2.34,discovered:1808,phase:"solid",eneg:2.04,radius:87,ionization:800.6},
+  {z:6,sym:"C",name:"Carbon",mass:12.011,cat:"nonmetal",group:14,period:2,econfig:"[He] 2s² 2p²",mp:3823,bp:4098,density:2.267,discovered:-3750,phase:"solid",eneg:2.55,radius:67,ionization:1086.5},
+  {z:7,sym:"N",name:"Nitrogen",mass:14.007,cat:"nonmetal",group:15,period:2,econfig:"[He] 2s² 2p³",mp:63.15,bp:77.36,density:0.0012506,discovered:1772,phase:"gas",eneg:3.04,radius:56,ionization:1402.3},
+  {z:8,sym:"O",name:"Oxygen",mass:15.999,cat:"nonmetal",group:16,period:2,econfig:"[He] 2s² 2p⁴",mp:54.36,bp:90.2,density:0.001429,discovered:1774,phase:"gas",eneg:3.44,radius:48,ionization:1313.9},
+  {z:9,sym:"F",name:"Fluorine",mass:18.998,cat:"halogen",group:17,period:2,econfig:"[He] 2s² 2p⁵",mp:53.53,bp:85.03,density:0.001696,discovered:1886,phase:"gas",eneg:3.98,radius:42,ionization:1681.0},
+  {z:10,sym:"Ne",name:"Neon",mass:20.180,cat:"noble",group:18,period:2,econfig:"[He] 2s² 2p⁶",mp:24.56,bp:27.07,density:0.0008999,discovered:1898,phase:"gas",eneg:null,radius:38,ionization:2080.7},
+  {z:11,sym:"Na",name:"Sodium",mass:22.990,cat:"alkali",group:1,period:3,econfig:"[Ne] 3s¹",mp:370.87,bp:1156,density:0.971,discovered:1807,phase:"solid",eneg:0.93,radius:190,ionization:495.8},
+  {z:12,sym:"Mg",name:"Magnesium",mass:24.305,cat:"alkaline",group:2,period:3,econfig:"[Ne] 3s²",mp:923,bp:1363,density:1.738,discovered:1755,phase:"solid",eneg:1.31,radius:145,ionization:737.7},
+  {z:13,sym:"Al",name:"Aluminium",mass:26.982,cat:"post-transition",group:13,period:3,econfig:"[Ne] 3s² 3p¹",mp:933.47,bp:2792,density:2.698,discovered:1825,phase:"solid",eneg:1.61,radius:118,ionization:577.5},
+  {z:14,sym:"Si",name:"Silicon",mass:28.086,cat:"metalloid",group:14,period:3,econfig:"[Ne] 3s² 3p²",mp:1687,bp:3538,density:2.3296,discovered:1824,phase:"solid",eneg:1.90,radius:111,ionization:786.5},
+  {z:15,sym:"P",name:"Phosphorus",mass:30.974,cat:"nonmetal",group:15,period:3,econfig:"[Ne] 3s² 3p³",mp:317.3,bp:553.65,density:1.82,discovered:1669,phase:"solid",eneg:2.19,radius:98,ionization:1011.8},
+  {z:16,sym:"S",name:"Sulfur",mass:32.06,cat:"nonmetal",group:16,period:3,econfig:"[Ne] 3s² 3p⁴",mp:388.36,bp:717.87,density:2.067,discovered:-2000,phase:"solid",eneg:2.58,radius:88,ionization:999.6},
+  {z:17,sym:"Cl",name:"Chlorine",mass:35.45,cat:"halogen",group:17,period:3,econfig:"[Ne] 3s² 3p⁵",mp:171.6,bp:239.11,density:0.003214,discovered:1774,phase:"gas",eneg:3.16,radius:79,ionization:1251.2},
+  {z:18,sym:"Ar",name:"Argon",mass:39.948,cat:"noble",group:18,period:3,econfig:"[Ne] 3s² 3p⁶",mp:83.8,bp:87.3,density:0.0017837,discovered:1894,phase:"gas",eneg:null,radius:71,ionization:1520.6},
+  {z:19,sym:"K",name:"Potassium",mass:39.098,cat:"alkali",group:1,period:4,econfig:"[Ar] 4s¹",mp:336.53,bp:1032,density:0.862,discovered:1807,phase:"solid",eneg:0.82,radius:243,ionization:418.8},
+  {z:20,sym:"Ca",name:"Calcium",mass:40.078,cat:"alkaline",group:2,period:4,econfig:"[Ar] 4s²",mp:1115,bp:1757,density:1.54,discovered:1808,phase:"solid",eneg:1.00,radius:194,ionization:589.8},
+  {z:21,sym:"Sc",name:"Scandium",mass:44.956,cat:"transition",group:3,period:4,econfig:"[Ar] 3d¹ 4s²",mp:1814,bp:3109,density:2.989,discovered:1879,phase:"solid",eneg:1.36,radius:184,ionization:633.1},
+  {z:22,sym:"Ti",name:"Titanium",mass:47.867,cat:"transition",group:4,period:4,econfig:"[Ar] 3d² 4s²",mp:1941,bp:3560,density:4.54,discovered:1791,phase:"solid",eneg:1.54,radius:176,ionization:658.8},
+  {z:23,sym:"V",name:"Vanadium",mass:50.942,cat:"transition",group:5,period:4,econfig:"[Ar] 3d³ 4s²",mp:2183,bp:3680,density:6.11,discovered:1801,phase:"solid",eneg:1.63,radius:171,ionization:650.9},
+  {z:24,sym:"Cr",name:"Chromium",mass:51.996,cat:"transition",group:6,period:4,econfig:"[Ar] 3d⁵ 4s¹",mp:2180,bp:2944,density:7.15,discovered:1797,phase:"solid",eneg:1.66,radius:166,ionization:652.9},
+  {z:25,sym:"Mn",name:"Manganese",mass:54.938,cat:"transition",group:7,period:4,econfig:"[Ar] 3d⁵ 4s²",mp:1519,bp:2334,density:7.44,discovered:1774,phase:"solid",eneg:1.55,radius:161,ionization:717.3},
+  {z:26,sym:"Fe",name:"Iron",mass:55.845,cat:"transition",group:8,period:4,econfig:"[Ar] 3d⁶ 4s²",mp:1811,bp:3134,density:7.874,discovered:-5000,phase:"solid",eneg:1.83,radius:156,ionization:762.5},
+  {z:27,sym:"Co",name:"Cobalt",mass:58.933,cat:"transition",group:9,period:4,econfig:"[Ar] 3d⁷ 4s²",mp:1768,bp:3200,density:8.86,discovered:1735,phase:"solid",eneg:1.88,radius:152,ionization:760.4},
+  {z:28,sym:"Ni",name:"Nickel",mass:58.693,cat:"transition",group:10,period:4,econfig:"[Ar] 3d⁸ 4s²",mp:1728,bp:3186,density:8.912,discovered:1751,phase:"solid",eneg:1.91,radius:149,ionization:737.1},
+  {z:29,sym:"Cu",name:"Copper",mass:63.546,cat:"transition",group:11,period:4,econfig:"[Ar] 3d¹⁰ 4s¹",mp:1357.77,bp:2835,density:8.96,discovered:-9000,phase:"solid",eneg:1.90,radius:145,ionization:745.5},
+  {z:30,sym:"Zn",name:"Zinc",mass:65.38,cat:"post-transition",group:12,period:4,econfig:"[Ar] 3d¹⁰ 4s²",mp:692.88,bp:1180,density:7.134,discovered:1500,phase:"solid",eneg:1.65,radius:142,ionization:906.4},
+  {z:31,sym:"Ga",name:"Gallium",mass:69.723,cat:"post-transition",group:13,period:4,econfig:"[Ar] 3d¹⁰ 4s² 4p¹",mp:302.91,bp:2477,density:5.907,discovered:1875,phase:"solid",eneg:1.81,radius:136,ionization:578.8},
+  {z:32,sym:"Ge",name:"Germanium",mass:72.63,cat:"metalloid",group:14,period:4,econfig:"[Ar] 3d¹⁰ 4s² 4p²",mp:1211.4,bp:3106,density:5.323,discovered:1886,phase:"solid",eneg:2.01,radius:125,ionization:762.2},
+  {z:33,sym:"As",name:"Arsenic",mass:74.922,cat:"metalloid",group:15,period:4,econfig:"[Ar] 3d¹⁰ 4s² 4p³",mp:1090,bp:887,density:5.776,discovered:1250,phase:"solid",eneg:2.18,radius:114,ionization:947.0},
+  {z:34,sym:"Se",name:"Selenium",mass:78.971,cat:"nonmetal",group:16,period:4,econfig:"[Ar] 3d¹⁰ 4s² 4p⁴",mp:493.65,bp:958,density:4.809,discovered:1817,phase:"solid",eneg:2.55,radius:103,ionization:941.0},
+  {z:35,sym:"Br",name:"Bromine",mass:79.904,cat:"halogen",group:17,period:4,econfig:"[Ar] 3d¹⁰ 4s² 4p⁵",mp:265.8,bp:332,density:3.122,discovered:1826,phase:"liquid",eneg:2.96,radius:94,ionization:1139.9},
+  {z:36,sym:"Kr",name:"Krypton",mass:83.798,cat:"noble",group:18,period:4,econfig:"[Ar] 3d¹⁰ 4s² 4p⁶",mp:115.79,bp:119.93,density:0.003733,discovered:1898,phase:"gas",eneg:3.00,radius:88,ionization:1350.8},
+  {z:37,sym:"Rb",name:"Rubidium",mass:85.468,cat:"alkali",group:1,period:5,econfig:"[Kr] 5s¹",mp:312.46,bp:961,density:1.532,discovered:1861,phase:"solid",eneg:0.82,radius:265,ionization:403.0},
+  {z:38,sym:"Sr",name:"Strontium",mass:87.62,cat:"alkaline",group:2,period:5,econfig:"[Kr] 5s²",mp:1050,bp:1655,density:2.64,discovered:1790,phase:"solid",eneg:0.95,radius:219,ionization:549.5},
+  {z:39,sym:"Y",name:"Yttrium",mass:88.906,cat:"transition",group:3,period:5,econfig:"[Kr] 4d¹ 5s²",mp:1799,bp:3609,density:4.469,discovered:1794,phase:"solid",eneg:1.22,radius:212,ionization:600.0},
+  {z:40,sym:"Zr",name:"Zirconium",mass:91.224,cat:"transition",group:4,period:5,econfig:"[Kr] 4d² 5s²",mp:2128,bp:4682,density:6.506,discovered:1789,phase:"solid",eneg:1.33,radius:206,ionization:640.1},
+  {z:41,sym:"Nb",name:"Niobium",mass:92.906,cat:"transition",group:5,period:5,econfig:"[Kr] 4d⁴ 5s¹",mp:2750,bp:5017,density:8.57,discovered:1801,phase:"solid",eneg:1.6,radius:198,ionization:652.1},
+  {z:42,sym:"Mo",name:"Molybdenum",mass:95.95,cat:"transition",group:6,period:5,econfig:"[Kr] 4d⁵ 5s¹",mp:2896,bp:4912,density:10.22,discovered:1781,phase:"solid",eneg:2.16,radius:190,ionization:684.3},
+  {z:43,sym:"Tc",name:"Technetium",mass:98,cat:"transition",group:7,period:5,econfig:"[Kr] 4d⁵ 5s²",mp:2430,bp:4538,density:11.5,discovered:1937,phase:"solid",eneg:1.9,radius:183,ionization:702.0},
+  {z:44,sym:"Ru",name:"Ruthenium",mass:101.07,cat:"transition",group:8,period:5,econfig:"[Kr] 4d⁷ 5s¹",mp:2607,bp:4423,density:12.37,discovered:1844,phase:"solid",eneg:2.2,radius:178,ionization:710.2},
+  {z:45,sym:"Rh",name:"Rhodium",mass:102.91,cat:"transition",group:9,period:5,econfig:"[Kr] 4d⁸ 5s¹",mp:2237,bp:3968,density:12.41,discovered:1803,phase:"solid",eneg:2.28,radius:173,ionization:719.7},
+  {z:46,sym:"Pd",name:"Palladium",mass:106.42,cat:"transition",group:10,period:5,econfig:"[Kr] 4d¹⁰",mp:1828.05,bp:3236,density:12.02,discovered:1803,phase:"solid",eneg:2.20,radius:169,ionization:804.4},
+  {z:47,sym:"Ag",name:"Silver",mass:107.87,cat:"transition",group:11,period:5,econfig:"[Kr] 4d¹⁰ 5s¹",mp:1234.93,bp:2435,density:10.501,discovered:-5000,phase:"solid",eneg:1.93,radius:165,ionization:731.0},
+  {z:48,sym:"Cd",name:"Cadmium",mass:112.41,cat:"post-transition",group:12,period:5,econfig:"[Kr] 4d¹⁰ 5s²",mp:594.22,bp:1040,density:8.69,discovered:1817,phase:"solid",eneg:1.69,radius:161,ionization:867.8},
+  {z:49,sym:"In",name:"Indium",mass:114.82,cat:"post-transition",group:13,period:5,econfig:"[Kr] 4d¹⁰ 5s² 5p¹",mp:429.75,bp:2345,density:7.31,discovered:1863,phase:"solid",eneg:1.78,radius:156,ionization:558.3},
+  {z:50,sym:"Sn",name:"Tin",mass:118.71,cat:"post-transition",group:14,period:5,econfig:"[Kr] 4d¹⁰ 5s² 5p²",mp:505.08,bp:2875,density:7.287,discovered:-3500,phase:"solid",eneg:1.96,radius:145,ionization:708.6},
+  {z:51,sym:"Sb",name:"Antimony",mass:121.76,cat:"metalloid",group:15,period:5,econfig:"[Kr] 4d¹⁰ 5s² 5p³",mp:903.78,bp:1860,density:6.685,discovered:-3000,phase:"solid",eneg:2.05,radius:133,ionization:834.0},
+  {z:52,sym:"Te",name:"Tellurium",mass:127.60,cat:"metalloid",group:16,period:5,econfig:"[Kr] 4d¹⁰ 5s² 5p⁴",mp:722.66,bp:1261,density:6.232,discovered:1783,phase:"solid",eneg:2.1,radius:123,ionization:869.3},
+  {z:53,sym:"I",name:"Iodine",mass:126.90,cat:"halogen",group:17,period:5,econfig:"[Kr] 4d¹⁰ 5s² 5p⁵",mp:386.85,bp:457.4,density:4.93,discovered:1811,phase:"solid",eneg:2.66,radius:115,ionization:1008.4},
+  {z:54,sym:"Xe",name:"Xenon",mass:131.29,cat:"noble",group:18,period:5,econfig:"[Kr] 4d¹⁰ 5s² 5p⁶",mp:161.4,bp:165.03,density:0.005887,discovered:1898,phase:"gas",eneg:2.6,radius:108,ionization:1170.4},
+  {z:55,sym:"Cs",name:"Caesium",mass:132.91,cat:"alkali",group:1,period:6,econfig:"[Xe] 6s¹",mp:301.59,bp:944,density:1.873,discovered:1860,phase:"solid",eneg:0.79,radius:298,ionization:375.7},
+  {z:56,sym:"Ba",name:"Barium",mass:137.33,cat:"alkaline",group:2,period:6,econfig:"[Xe] 6s²",mp:1000,bp:2170,density:3.594,discovered:1808,phase:"solid",eneg:0.89,radius:253,ionization:502.9},
+  {z:57,sym:"La",name:"Lanthanum",mass:138.91,cat:"lanthanide",group:3,period:6,econfig:"[Xe] 5d¹ 6s²",mp:1193,bp:3737,density:6.145,discovered:1839,phase:"solid",eneg:1.1,radius:null,ionization:538.1},
+  {z:58,sym:"Ce",name:"Cerium",mass:140.12,cat:"lanthanide",group:null,period:6,econfig:"[Xe] 4f¹ 5d¹ 6s²",mp:1068,bp:3716,density:6.77,discovered:1803,phase:"solid",eneg:1.12,radius:null,ionization:534.4},
+  {z:59,sym:"Pr",name:"Praseodymium",mass:140.91,cat:"lanthanide",group:null,period:6,econfig:"[Xe] 4f³ 6s²",mp:1208,bp:3793,density:6.773,discovered:1885,phase:"solid",eneg:1.13,radius:null,ionization:527.0},
+  {z:60,sym:"Nd",name:"Neodymium",mass:144.24,cat:"lanthanide",group:null,period:6,econfig:"[Xe] 4f⁴ 6s²",mp:1297,bp:3347,density:7.007,discovered:1885,phase:"solid",eneg:1.14,radius:null,ionization:533.1},
+  {z:61,sym:"Pm",name:"Promethium",mass:145,cat:"lanthanide",group:null,period:6,econfig:"[Xe] 4f⁵ 6s²",mp:1315,bp:3273,density:7.26,discovered:1945,phase:"solid",eneg:1.13,radius:null,ionization:540.0},
+  {z:62,sym:"Sm",name:"Samarium",mass:150.36,cat:"lanthanide",group:null,period:6,econfig:"[Xe] 4f⁶ 6s²",mp:1345,bp:2067,density:7.52,discovered:1879,phase:"solid",eneg:1.17,radius:null,ionization:544.5},
+  {z:63,sym:"Eu",name:"Europium",mass:151.96,cat:"lanthanide",group:null,period:6,econfig:"[Xe] 4f⁷ 6s²",mp:1099,bp:1802,density:5.243,discovered:1901,phase:"solid",eneg:1.2,radius:null,ionization:547.1},
+  {z:64,sym:"Gd",name:"Gadolinium",mass:157.25,cat:"lanthanide",group:null,period:6,econfig:"[Xe] 4f⁷ 5d¹ 6s²",mp:1585,bp:3546,density:7.895,discovered:1880,phase:"solid",eneg:1.2,radius:null,ionization:593.4},
+  {z:65,sym:"Tb",name:"Terbium",mass:158.93,cat:"lanthanide",group:null,period:6,econfig:"[Xe] 4f⁹ 6s²",mp:1629,bp:3503,density:8.229,discovered:1843,phase:"solid",eneg:1.1,radius:null,ionization:565.8},
+  {z:66,sym:"Dy",name:"Dysprosium",mass:162.50,cat:"lanthanide",group:null,period:6,econfig:"[Xe] 4f¹⁰ 6s²",mp:1680,bp:2840,density:8.55,discovered:1886,phase:"solid",eneg:1.22,radius:null,ionization:573.0},
+  {z:67,sym:"Ho",name:"Holmium",mass:164.93,cat:"lanthanide",group:null,period:6,econfig:"[Xe] 4f¹¹ 6s²",mp:1734,bp:2993,density:8.795,discovered:1878,phase:"solid",eneg:1.23,radius:null,ionization:581.0},
+  {z:68,sym:"Er",name:"Erbium",mass:167.26,cat:"lanthanide",group:null,period:6,econfig:"[Xe] 4f¹² 6s²",mp:1802,bp:3141,density:9.066,discovered:1842,phase:"solid",eneg:1.24,radius:null,ionization:589.3},
+  {z:69,sym:"Tm",name:"Thulium",mass:168.93,cat:"lanthanide",group:null,period:6,econfig:"[Xe] 4f¹³ 6s²",mp:1818,bp:2223,density:9.321,discovered:1879,phase:"solid",eneg:1.25,radius:null,ionization:596.7},
+  {z:70,sym:"Yb",name:"Ytterbium",mass:173.05,cat:"lanthanide",group:null,period:6,econfig:"[Xe] 4f¹⁴ 6s²",mp:1097,bp:1469,density:6.965,discovered:1878,phase:"solid",eneg:1.1,radius:null,ionization:603.4},
+  {z:71,sym:"Lu",name:"Lutetium",mass:174.97,cat:"lanthanide",group:null,period:6,econfig:"[Xe] 4f¹⁴ 5d¹ 6s²",mp:1925,bp:3675,density:9.84,discovered:1907,phase:"solid",eneg:1.27,radius:null,ionization:523.5},
+  {z:72,sym:"Hf",name:"Hafnium",mass:178.49,cat:"transition",group:4,period:6,econfig:"[Xe] 4f¹⁴ 5d² 6s²",mp:2506,bp:4876,density:13.31,discovered:1923,phase:"solid",eneg:1.3,radius:175,ionization:658.5},
+  {z:73,sym:"Ta",name:"Tantalum",mass:180.95,cat:"transition",group:5,period:6,econfig:"[Xe] 4f¹⁴ 5d³ 6s²",mp:3290,bp:5731,density:16.654,discovered:1802,phase:"solid",eneg:1.5,radius:170,ionization:761.0},
+  {z:74,sym:"W",name:"Tungsten",mass:183.84,cat:"transition",group:6,period:6,econfig:"[Xe] 4f¹⁴ 5d⁴ 6s²",mp:3695,bp:5828,density:19.25,discovered:1783,phase:"solid",eneg:2.36,radius:162,ionization:770.0},
+  {z:75,sym:"Re",name:"Rhenium",mass:186.21,cat:"transition",group:7,period:6,econfig:"[Xe] 4f¹⁴ 5d⁵ 6s²",mp:3459,bp:5869,density:21.02,discovered:1925,phase:"solid",eneg:1.9,radius:151,ionization:760.0},
+  {z:76,sym:"Os",name:"Osmium",mass:190.23,cat:"transition",group:8,period:6,econfig:"[Xe] 4f¹⁴ 5d⁶ 6s²",mp:3306,bp:5285,density:22.59,discovered:1803,phase:"solid",eneg:2.2,radius:144,ionization:840.0},
+  {z:77,sym:"Ir",name:"Iridium",mass:192.22,cat:"transition",group:9,period:6,econfig:"[Xe] 4f¹⁴ 5d⁷ 6s²",mp:2719,bp:4701,density:22.56,discovered:1803,phase:"solid",eneg:2.20,radius:141,ionization:880.0},
+  {z:78,sym:"Pt",name:"Platinum",mass:195.08,cat:"transition",group:10,period:6,econfig:"[Xe] 4f¹⁴ 5d⁹ 6s¹",mp:2041.4,bp:4098,density:21.46,discovered:1735,phase:"solid",eneg:2.28,radius:136,ionization:870.0},
+  {z:79,sym:"Au",name:"Gold",mass:196.97,cat:"transition",group:11,period:6,econfig:"[Xe] 4f¹⁴ 5d¹⁰ 6s¹",mp:1337.33,bp:3129,density:19.282,discovered:-6000,phase:"solid",eneg:2.54,radius:136,ionization:890.1},
+  {z:80,sym:"Hg",name:"Mercury",mass:200.59,cat:"post-transition",group:12,period:6,econfig:"[Xe] 4f¹⁴ 5d¹⁰ 6s²",mp:234.32,bp:629.88,density:13.5336,discovered:-1500,phase:"liquid",eneg:2.00,radius:132,ionization:1007.1},
+  {z:81,sym:"Tl",name:"Thallium",mass:204.38,cat:"post-transition",group:13,period:6,econfig:"[Xe] 4f¹⁴ 5d¹⁰ 6s² 6p¹",mp:577,bp:1746,density:11.85,discovered:1861,phase:"solid",eneg:1.62,radius:145,ionization:589.4},
+  {z:82,sym:"Pb",name:"Lead",mass:207.2,cat:"post-transition",group:14,period:6,econfig:"[Xe] 4f¹⁴ 5d¹⁰ 6s² 6p²",mp:600.61,bp:2022,density:11.342,discovered:-7000,phase:"solid",eneg:1.87,radius:146,ionization:715.6},
+  {z:83,sym:"Bi",name:"Bismuth",mass:208.98,cat:"post-transition",group:15,period:6,econfig:"[Xe] 4f¹⁴ 5d¹⁰ 6s² 6p³",mp:544.55,bp:1837,density:9.807,discovered:1753,phase:"solid",eneg:2.02,radius:148,ionization:703.0},
+  {z:84,sym:"Po",name:"Polonium",mass:209,cat:"post-transition",group:16,period:6,econfig:"[Xe] 4f¹⁴ 5d¹⁰ 6s² 6p⁴",mp:527,bp:1235,density:9.32,discovered:1898,phase:"solid",eneg:2.0,radius:140,ionization:812.1},
+  {z:85,sym:"At",name:"Astatine",mass:210,cat:"halogen",group:17,period:6,econfig:"[Xe] 4f¹⁴ 5d¹⁰ 6s² 6p⁵",mp:575,bp:610,density:7,discovered:1940,phase:"solid",eneg:2.2,radius:150,ionization:920.0},
+  {z:86,sym:"Rn",name:"Radon",mass:222,cat:"noble",group:18,period:6,econfig:"[Xe] 4f¹⁴ 5d¹⁰ 6s² 6p⁶",mp:202,bp:211.3,density:0.00973,discovered:1900,phase:"gas",eneg:2.2,radius:150,ionization:1037.0},
+  {z:87,sym:"Fr",name:"Francium",mass:223,cat:"alkali",group:1,period:7,econfig:"[Rn] 7s¹",mp:300,bp:950,density:1.87,discovered:1939,phase:"solid",eneg:0.7,radius:null,ionization:380.0},
+  {z:88,sym:"Ra",name:"Radium",mass:226,cat:"alkaline",group:2,period:7,econfig:"[Rn] 7s²",mp:973,bp:2010,density:5.5,discovered:1898,phase:"solid",eneg:0.9,radius:null,ionization:509.3},
+  {z:89,sym:"Ac",name:"Actinium",mass:227,cat:"actinide",group:3,period:7,econfig:"[Rn] 6d¹ 7s²",mp:1323,bp:3471,density:10.07,discovered:1899,phase:"solid",eneg:1.1,radius:null,ionization:499.0},
+  {z:90,sym:"Th",name:"Thorium",mass:232.04,cat:"actinide",group:null,period:7,econfig:"[Rn] 6d² 7s²",mp:2115,bp:5061,density:11.72,discovered:1829,phase:"solid",eneg:1.3,radius:null,ionization:587.0},
+  {z:91,sym:"Pa",name:"Protactinium",mass:231.04,cat:"actinide",group:null,period:7,econfig:"[Rn] 5f² 6d¹ 7s²",mp:1841,bp:4300,density:15.37,discovered:1913,phase:"solid",eneg:1.5,radius:null,ionization:568.0},
+  {z:92,sym:"U",name:"Uranium",mass:238.03,cat:"actinide",group:null,period:7,econfig:"[Rn] 5f³ 6d¹ 7s²",mp:1405.3,bp:4404,density:18.95,discovered:1789,phase:"solid",eneg:1.38,radius:null,ionization:597.6},
+  {z:93,sym:"Np",name:"Neptunium",mass:237,cat:"actinide",group:null,period:7,econfig:"[Rn] 5f⁴ 6d¹ 7s²",mp:917,bp:4273,density:20.45,discovered:1940,phase:"solid",eneg:1.36,radius:null,ionization:604.5},
+  {z:94,sym:"Pu",name:"Plutonium",mass:244,cat:"actinide",group:null,period:7,econfig:"[Rn] 5f⁶ 7s²",mp:912.5,bp:3501,density:19.84,discovered:1940,phase:"solid",eneg:1.28,radius:null,ionization:584.7},
+  {z:95,sym:"Am",name:"Americium",mass:243,cat:"actinide",group:null,period:7,econfig:"[Rn] 5f⁷ 7s²",mp:1449,bp:2880,density:13.69,discovered:1944,phase:"solid",eneg:1.13,radius:null,ionization:578.0},
+  {z:96,sym:"Cm",name:"Curium",mass:247,cat:"actinide",group:null,period:7,econfig:"[Rn] 5f⁷ 6d¹ 7s²",mp:1613,bp:3383,density:13.51,discovered:1944,phase:"solid",eneg:1.28,radius:null,ionization:581.0},
+  {z:97,sym:"Bk",name:"Berkelium",mass:247,cat:"actinide",group:null,period:7,econfig:"[Rn] 5f⁹ 7s²",mp:1259,bp:2900,density:14.79,discovered:1949,phase:"solid",eneg:1.3,radius:null,ionization:601.0},
+  {z:98,sym:"Cf",name:"Californium",mass:251,cat:"actinide",group:null,period:7,econfig:"[Rn] 5f¹⁰ 7s²",mp:1173,bp:1743,density:15.1,discovered:1950,phase:"solid",eneg:1.3,radius:null,ionization:608.0},
+  {z:99,sym:"Es",name:"Einsteinium",mass:252,cat:"actinide",group:null,period:7,econfig:"[Rn] 5f¹¹ 7s²",mp:1133,bp:1269,density:8.84,discovered:1952,phase:"solid",eneg:1.3,radius:null,ionization:619.0},
+  {z:100,sym:"Fm",name:"Fermium",mass:257,cat:"actinide",group:null,period:7,econfig:"[Rn] 5f¹² 7s²",mp:1800,bp:null,density:null,discovered:1952,phase:"solid",eneg:1.3,radius:null,ionization:627.0},
+  {z:101,sym:"Md",name:"Mendelevium",mass:258,cat:"actinide",group:null,period:7,econfig:"[Rn] 5f¹³ 7s²",mp:1100,bp:null,density:null,discovered:1955,phase:"solid",eneg:1.3,radius:null,ionization:635.0},
+  {z:102,sym:"No",name:"Nobelium",mass:259,cat:"actinide",group:null,period:7,econfig:"[Rn] 5f¹⁴ 7s²",mp:1100,bp:null,density:null,discovered:1966,phase:"solid",eneg:1.3,radius:null,ionization:642.0},
+  {z:103,sym:"Lr",name:"Lawrencium",mass:266,cat:"actinide",group:null,period:7,econfig:"[Rn] 5f¹⁴ 7s² 7p¹",mp:1900,bp:null,density:null,discovered:1961,phase:"solid",eneg:1.3,radius:null,ionization:470.0},
+  {z:104,sym:"Rf",name:"Rutherfordium",mass:267,cat:"transition",group:4,period:7,econfig:"[Rn] 5f¹⁴ 6d² 7s²",mp:2400,bp:5800,density:23.2,discovered:1964,phase:"solid",eneg:null,radius:null,ionization:580.0},
+  {z:105,sym:"Db",name:"Dubnium",mass:268,cat:"transition",group:5,period:7,econfig:"[Rn] 5f¹⁴ 6d³ 7s²",mp:null,bp:null,density:29.3,discovered:1967,phase:"unknown",eneg:null,radius:null,ionization:null},
+  {z:106,sym:"Sg",name:"Seaborgium",mass:269,cat:"transition",group:6,period:7,econfig:"[Rn] 5f¹⁴ 6d⁴ 7s²",mp:null,bp:null,density:35,discovered:1974,phase:"unknown",eneg:null,radius:null,ionization:null},
+  {z:107,sym:"Bh",name:"Bohrium",mass:270,cat:"transition",group:7,period:7,econfig:"[Rn] 5f¹⁴ 6d⁵ 7s²",mp:null,bp:null,density:37.1,discovered:1981,phase:"unknown",eneg:null,radius:null,ionization:null},
+  {z:108,sym:"Hs",name:"Hassium",mass:277,cat:"transition",group:8,period:7,econfig:"[Rn] 5f¹⁴ 6d⁶ 7s²",mp:null,bp:null,density:40.7,discovered:1984,phase:"unknown",eneg:null,radius:null,ionization:null},
+  {z:109,sym:"Mt",name:"Meitnerium",mass:278,cat:"unknown",group:9,period:7,econfig:"[Rn] 5f¹⁴ 6d⁷ 7s²",mp:null,bp:null,density:37.4,discovered:1982,phase:"unknown",eneg:null,radius:null,ionization:null},
+  {z:110,sym:"Ds",name:"Darmstadtium",mass:281,cat:"unknown",group:10,period:7,econfig:"[Rn] 5f¹⁴ 6d⁸ 7s²",mp:null,bp:null,density:34.8,discovered:1994,phase:"unknown",eneg:null,radius:null,ionization:null},
+  {z:111,sym:"Rg",name:"Roentgenium",mass:282,cat:"unknown",group:11,period:7,econfig:"[Rn] 5f¹⁴ 6d⁹ 7s²",mp:null,bp:null,density:28.7,discovered:1994,phase:"unknown",eneg:null,radius:null,ionization:null},
+  {z:112,sym:"Cn",name:"Copernicium",mass:285,cat:"post-transition",group:12,period:7,econfig:"[Rn] 5f¹⁴ 6d¹⁰ 7s²",mp:null,bp:357,density:23.7,discovered:1996,phase:"unknown",eneg:null,radius:null,ionization:null},
+  {z:113,sym:"Nh",name:"Nihonium",mass:286,cat:"unknown",group:13,period:7,econfig:"[Rn] 5f¹⁴ 6d¹⁰ 7s² 7p¹",mp:700,bp:1400,density:16,discovered:2003,phase:"unknown",eneg:null,radius:null,ionization:null},
+  {z:114,sym:"Fl",name:"Flerovium",mass:289,cat:"unknown",group:14,period:7,econfig:"[Rn] 5f¹⁴ 6d¹⁰ 7s² 7p²",mp:null,bp:210,density:14,discovered:1998,phase:"unknown",eneg:null,radius:null,ionization:null},
+  {z:115,sym:"Mc",name:"Moscovium",mass:290,cat:"unknown",group:15,period:7,econfig:"[Rn] 5f¹⁴ 6d¹⁰ 7s² 7p³",mp:700,bp:1400,density:13.5,discovered:2003,phase:"unknown",eneg:null,radius:null,ionization:null},
+  {z:116,sym:"Lv",name:"Livermorium",mass:293,cat:"unknown",group:16,period:7,econfig:"[Rn] 5f¹⁴ 6d¹⁰ 7s² 7p⁴",mp:700,bp:1100,density:12.9,discovered:2000,phase:"unknown",eneg:null,radius:null,ionization:null},
+  {z:117,sym:"Ts",name:"Tennessine",mass:294,cat:"unknown",group:17,period:7,econfig:"[Rn] 5f¹⁴ 6d¹⁰ 7s² 7p⁵",mp:700,bp:883,density:7.2,discovered:2009,phase:"unknown",eneg:null,radius:null,ionization:null},
+  {z:118,sym:"Og",name:"Oganesson",mass:294,cat:"unknown",group:18,period:7,econfig:"[Rn] 5f¹⁴ 6d¹⁰ 7s² 7p⁶",mp:null,bp:350,density:5.0,discovered:2002,phase:"unknown",eneg:null,radius:null,ionization:null},
+];
+
+const categories = {
+  alkali: {label:"Alkali Metal", color:"var(--alkali)"},
+  alkaline: {label:"Alkaline Earth", color:"var(--alkaline)"},
+  transition: {label:"Transition Metal", color:"var(--transition)"},
+  "post-transition": {label:"Post-transition", color:"var(--post-transition)"},
+  metalloid: {label:"Metalloid", color:"var(--metalloid)"},
+  nonmetal: {label:"Nonmetal", color:"var(--nonmetal)"},
+  halogen: {label:"Halogen", color:"var(--halogen)"},
+  noble: {label:"Noble Gas", color:"var(--noble)"},
+  lanthanide: {label:"Lanthanide", color:"var(--lanthanide)"},
+  actinide: {label:"Actinide", color:"var(--actinide)"},
+  unknown: {label:"Unknown", color:"var(--unknown)"},
+};
+
+// Build layout: standard 18-column periodic table
+function getGridPosition(el) {
+  // Lanthanides (57-71) and Actinides (89-103) go in separate rows
+  if (el.z >= 57 && el.z <= 71) return null; // lanthanide
+  if (el.z >= 89 && el.z <= 103) return null; // actinide
+  return { row: el.period, col: el.group };
+}
+
+const grid = document.getElementById('grid');
+const filtersEl = document.getElementById('filters');
+const legendEl = document.getElementById('legend');
+const overlay = document.getElementById('overlay');
+const detailPanel = document.getElementById('detailPanel');
+const detailContent = document.getElementById('detailContent');
+const detailClose = document.getElementById('detailClose');
+const searchInput = document.getElementById('search');
+const tempSlider = document.getElementById('tempSlider');
+const tempValue = document.getElementById('tempValue');
+
+let activeFilter = null;
+let searchTerm = '';
+let currentTemp = 293;
+
+// Build main table layout
+function buildTable() {
+  grid.innerHTML = '';
+
+  // Rows 1-7 (main table)
+  for (let period = 1; period <= 7; period++) {
+    for (let group = 1; group <= 18; group++) {
+      const el = elements.find(e => {
+        const pos = getGridPosition(e);
+        return pos && pos.row === period && pos.col === group;
+      });
+
+      if (el) {
+        grid.appendChild(createElementCell(el));
+      } else {
+        const spacer = document.createElement('div');
+        spacer.className = 'spacer';
+        grid.appendChild(spacer);
+      }
+    }
+  }
+
+  // Gap
+  const gap1 = document.createElement('div');
+  gap1.className = 'gap-row';
+  grid.appendChild(gap1);
+
+  // Lanthanide row (label + 3 spacers then 15 elements)
+  const lanLabel = document.createElement('div');
+  lanLabel.className = 'series-label';
+  lanLabel.textContent = 'Lanthanides';
+  grid.appendChild(lanLabel);
+
+  const lanthanides = elements.filter(e => e.z >= 57 && e.z <= 71);
+  lanthanides.forEach(el => grid.appendChild(createElementCell(el)));
+
+  // Actinide row
+  const actLabel = document.createElement('div');
+  actLabel.className = 'series-label';
+  actLabel.textContent = 'Actinides';
+  grid.appendChild(actLabel);
+
+  const actinides = elements.filter(e => e.z >= 89 && e.z <= 103);
+  actinides.forEach(el => grid.appendChild(createElementCell(el)));
+}
+
+function createElementCell(el) {
+  const div = document.createElement('div');
+  div.className = 'element';
+  div.style.setProperty('--cat-color', categories[el.cat]?.color || 'var(--unknown)');
+  div.dataset.z = el.z;
+  div.dataset.cat = el.cat;
+
+  div.innerHTML = `
+    <span class="number">${el.z}</span>
+    <span class="symbol">${el.sym}</span>
+    <span class="name">${el.name}</span>
+    <span class="mass">${el.mass}</span>
+  `;
+
+  div.addEventListener('click', () => showDetail(el));
+  return div;
+}
+
+function getStateAtTemp(el, temp) {
+  if (!el.mp && !el.bp) return 'unknown';
+  if (el.mp === null) {
+    return temp < el.bp ? 'solid' : 'gas'; // approximation
+  }
+  if (el.bp === null) {
+    return temp < el.mp ? 'solid' : 'liquid';
+  }
+  if (temp < el.mp) return 'solid';
+  if (temp < el.bp) return 'liquid';
+  return 'gas';
+}
+
+function updateDisplay() {
+  const cells = grid.querySelectorAll('.element');
+  cells.forEach(cell => {
+    const z = parseInt(cell.dataset.z);
+    const el = elements.find(e => e.z === z);
+    const cat = cell.dataset.cat;
+
+    // Filter logic
+    let dimmed = false;
+    if (activeFilter && cat !== activeFilter) dimmed = true;
+
+    // Search logic
+    if (searchTerm) {
+      const s = searchTerm.toLowerCase();
+      const matchesName = el.name.toLowerCase().includes(s);
+      const matchesSym = el.sym.toLowerCase().includes(s);
+      const matchesZ = el.z.toString() === s;
+      if (!matchesName && !matchesSym && !matchesZ) dimmed = true;
+    }
+
+    cell.classList.toggle('dimmed', dimmed);
+    cell.classList.toggle('highlighted', activeFilter === cat && !dimmed);
+
+    // State at temperature
+    const state = getStateAtTemp(el, currentTemp);
+    cell.classList.remove('state-solid','state-liquid','state-gas','state-unknown');
+    cell.classList.add('state-' + state);
+  });
+}
+
+// Filters
+function buildFilters() {
+  const allBtn = document.createElement('button');
+  allBtn.className = 'filter-btn active';
+  allBtn.textContent = 'All';
+  allBtn.addEventListener('click', () => {
+    activeFilter = null;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    allBtn.classList.add('active');
+    updateDisplay();
+  });
+  filtersEl.appendChild(allBtn);
+
+  Object.entries(categories).forEach(([key, val]) => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-btn';
+    btn.textContent = val.label;
+    btn.style.setProperty('--cat-color', val.color);
+    btn.addEventListener('click', () => {
+      activeFilter = key;
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      updateDisplay();
+    });
+    filtersEl.appendChild(btn);
+  });
+}
+
+// Legend
+function buildLegend() {
+  Object.entries(categories).forEach(([key, val]) => {
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.innerHTML = `<span class="legend-dot" style="background:${val.color}"></span>${val.label}`;
+    legendEl.appendChild(item);
+  });
+}
+
+// Detail panel
+function showDetail(el) {
+  const color = categories[el.cat]?.color || 'var(--unknown)';
+  detailPanel.style.setProperty('--cat-color', color);
+
+  const state = getStateAtTemp(el, currentTemp);
+  const disc = el.discovered < 0 ? `~${Math.abs(el.discovered)} BC` : el.discovered;
+
+  detailContent.innerHTML = `
+    <div class="detail-header">
+      <div class="detail-symbol-box">
+        <span class="number">${el.z}</span>
+        <span class="symbol">${el.sym}</span>
+      </div>
+      <div class="detail-info">
+        <h2>${el.name}</h2>
+        <div class="category">${categories[el.cat]?.label || 'Unknown'}</div>
+      </div>
+    </div>
+    <div class="detail-grid">
+      <div class="detail-item">
+        <div class="label">Atomic Mass</div>
+        <div class="value">${el.mass} <span class="unit">u</span></div>
+      </div>
+      <div class="detail-item">
+        <div class="label">State @ ${currentTemp} K</div>
+        <div class="value" style="text-transform:capitalize">${state}</div>
+      </div>
+      <div class="detail-item">
+        <div class="label">Melting Point</div>
+        <div class="value">${el.mp ? el.mp + ' <span class="unit">K</span>' : '—'}</div>
+      </div>
+      <div class="detail-item">
+        <div class="label">Boiling Point</div>
+        <div class="value">${el.bp ? el.bp + ' <span class="unit">K</span>' : '—'}</div>
+      </div>
+      <div class="detail-item">
+        <div class="label">Density</div>
+        <div class="value">${el.density ? el.density + ' <span class="unit">g/cm³</span>' : '—'}</div>
+      </div>
+      <div class="detail-item">
+        <div class="label">Electronegativity</div>
+        <div class="value">${el.eneg ?? '—'}</div>
+      </div>
+      <div class="detail-item">
+        <div class="label">Atomic Radius</div>
+        <div class="value">${el.radius ? el.radius + ' <span class="unit">pm</span>' : '—'}</div>
+      </div>
+      <div class="detail-item">
+        <div class="label">Ionization Energy</div>
+        <div class="value">${el.ionization ? el.ionization + ' <span class="unit">kJ/mol</span>' : '—'}</div>
+      </div>
+      <div class="detail-item">
+        <div class="label">Discovered</div>
+        <div class="value">${disc}</div>
+      </div>
+      <div class="detail-item">
+        <div class="label">Period / Group</div>
+        <div class="value">${el.period} / ${el.group ?? '—'}</div>
+      </div>
+      <div class="detail-item full">
+        <div class="label">Electron Configuration</div>
+        <div class="electron-config">${el.econfig}</div>
+      </div>
+    </div>
+  `;
+
+  overlay.classList.add('open');
+  detailPanel.classList.add('open');
+}
+
+function closeDetail() {
+  overlay.classList.remove('open');
+  detailPanel.classList.remove('open');
+}
+
+detailClose.addEventListener('click', closeDetail);
+overlay.addEventListener('click', closeDetail);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
+
+// Search
+searchInput.addEventListener('input', e => {
+  searchTerm = e.target.value.trim();
+  updateDisplay();
+});
+
+// Temperature slider
+tempSlider.addEventListener('input', e => {
+  currentTemp = parseInt(e.target.value);
+  tempValue.textContent = currentTemp + ' K';
+  updateDisplay();
+});
+
+// Init
+buildTable();
+buildFilters();
+buildLegend();
+updateDisplay();
+</script>
+</body>
+</html>
